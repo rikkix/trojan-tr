@@ -70,38 +70,17 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: LinuxBinary
-          path: ./artifacts/linux
+          path: ./artifacts/trojan-linux
 
       - name: Download macOS Binary
         uses: actions/download-artifact@v4
         with:
           name: macOSBinary
-          path: ./artifacts/macos
+          path: ./artifacts/trojan-macos
 
-      - name: Create GitHub Release
-        id: create_release
-        uses: ncipollo/release-action@v1
+      - name: Release
+        uses: softprops/action-gh-release@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref_name }}
-          name: 'Release ${{ github.ref_name }}'
-          draft: false
-          prerelease: false
-
-      - name: Upload Linux Binary to Release
-        uses: actions/upload-release-asset@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./artifacts/linux/trojan
-          asset_name: trojan-linux
-          asset_content_type: application/octet-stream
-
-      - name: Upload macOS Binary to Release
-        uses: actions/upload-release-asset@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./artifacts/macos/trojan
-          asset_name: trojan-macos
-          asset_content_type: application/octet-stream
+          files: |
+            ./artifacts/trojan-linux
+            ./artifacts/trojan-macos
