@@ -106,7 +106,22 @@ Authenticator::~Authenticator() {
 
 Authenticator::Authenticator(const Config&) {}
 bool Authenticator::auth(const string&) { return true; }
-void Authenticator::record(const string&, uint64_t, uint64_t) {}
+void Authenticator::record(const string &password, uint64_t download, uint64_t upload) {
+    std::unique_lock lock(mutex_);
+    auto it = records.find(password);
+    if (it == records.end()) {
+        records[password] = {download, upload};
+    } else {
+        it->second.download += download;
+        it->second.upload += upload;
+    }
+}
+
+std::map<string, TrafficRecord> Authenticator::get_traffic_records() {
+    std::shared_lock lock(mutex_);
+    return records;
+}
+
 bool Authenticator::is_valid_password(const string&) { return true; }
 Authenticator::~Authenticator() {}
 

@@ -36,6 +36,8 @@
 #include "session/natsession.h"
 #include "ssl/ssldefaults.h"
 #include "ssl/sslsession.h"
+#include "record.h"
+#include <thread>
 using namespace std;
 using namespace boost::asio::ip;
 using namespace boost::asio::ssl;
@@ -310,6 +312,11 @@ void Service::async_accept() {
     shared_ptr<Session>session(nullptr);
     if (config.run_type == Config::SERVER) {
         session = make_shared<ServerSession>(config, io_context, ssl_context, auth, plain_http_response);
+#ifndef ENABLE_MYSQL
+        // start save_traffic in dedicated thread
+        thread t(save_traffic, auth);
+        t.detach();
+#endif // ENABLE_MYSQL
     } else if (config.run_type == Config::FORWARD) {
         session = make_shared<ForwardSession>(config, io_context, ssl_context);
     } else if (config.run_type == Config::NAT) {
@@ -317,6 +324,7 @@ void Service::async_accept() {
     } else {
         session = make_shared<ClientSession>(config, io_context, ssl_context);
     }
+
     socket_acceptor.async_accept(session->accept_socket(), [this, session](const boost::system::error_code error) {
         if (error == boost::asio::error::operation_aborted) {
             // got cancel signal, stop calling myself

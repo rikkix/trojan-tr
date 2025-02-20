@@ -24,12 +24,23 @@
 #include <mysql.h>
 #endif // ENABLE_MYSQL
 #include "config.h"
+#include <shared_mutex>
+
+class TrafficRecord {
+public:
+    uint64_t download;
+    uint64_t upload;
+};
 
 class Authenticator {
 private:
 #ifdef ENABLE_MYSQL
     MYSQL con{};
+#else 
+    std::map<std::string, TrafficRecord> records;
+    mutable std::shared_mutex mutex_;
 #endif // ENABLE_MYSQL
+
     enum {
         PASSWORD_LENGTH=56
     };
@@ -38,6 +49,11 @@ public:
     explicit Authenticator(const Config &config);
     bool auth(const std::string &password);
     void record(const std::string &password, uint64_t download, uint64_t upload);
+
+#ifndef ENABLE_MYSQL
+    std::map<std::string, TrafficRecord> get_traffic_records();
+#endif // ENABLE_MYSQL
+
     ~Authenticator();
 };
 
