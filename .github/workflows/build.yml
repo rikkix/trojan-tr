@@ -1,9 +1,12 @@
 name: CI
 
+# Trigger the workflow on pushes to master and when a tag is pushed
 on:
   push:
     branches:
       - master
+    tags:
+      - '*'    # Triggers on all tag pushes
   pull_request:
 
 jobs:
@@ -12,14 +15,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Build trojan
         run: |
-          sudo apt-get install -y libboost-all-dev build-essential cmake libssl-dev 
+          sudo apt-get update
+          sudo apt-get install -y libboost-all-dev build-essential cmake libssl-dev
           echo 'target_link_libraries(trojan dl)' >> CMakeLists.txt
-          cmake -DMYSQL_INCLUDE_DIR=/usr/local/include/mariadb -DMYSQL_LIBRARY=/usr/local/lib/mariadb/libmysqlclient.a -DDEFAULT_CONFIG=config.json -DFORCE_TCP_FASTOPEN=ON -DBoost_USE_STATIC_LIBS=ON .
+          cmake -DMYSQL_INCLUDE_DIR=/usr/local/include/mariadb \
+                -DMYSQL_LIBRARY=/usr/local/lib/mariadb/libmysqlclient.a \
+                -DDEFAULT_CONFIG=config.json \
+                -DFORCE_TCP_FASTOPEN=ON \
+                -DBoost_USE_STATIC_LIBS=ON .
           make
           strip -s trojan
-      - name: Upload artifact
+
+      - name: Upload Linux Binary
         uses: actions/upload-artifact@v4
         with:
           name: LinuxBinary
@@ -30,15 +40,66 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Build trojan
         run: |
           set -euo pipefail
+          brew update
           brew install boost openssl
-          cmake -DBoost_USE_STATIC_LIBS=ON -DDEFAULT_CONFIG=config.json -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13 .
+          cmake -DBoost_USE_STATIC_LIBS=ON \
+                -DDEFAULT_CONFIG=config.json \
+                -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13 .
           make
           strip -SXTx trojan
-      - name: Upload artifact
+
+      - name: Upload macOS Binary
         uses: actions/upload-artifact@v4
         with:
           name: macOSBinary
           path: ./trojan
+
+  create-release:
+    name: Create Release
+    needs:
+      - build-linux
+      - build-macos
+    if: startsWith(github.ref, 'refs/tags/')   # Only run when a tag is pushed
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Linux Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: LinuxBinary
+          path: ./artifacts/linux
+
+      - name: Download macOS Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: macOSBinary
+          path: ./artifacts/macos
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+          name: 'Release ${{ github.ref_name }}'
+          draft: false
+          prerelease: false
+
+      - name: Upload Linux Binary to Release
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/linux/trojan
+          asset_name: trojan-linux
+          asset_content_type: application/octet-stream
+
+      - name: Upload macOS Binary to Release
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/macos/trojan
+          asset_name: trojan-macos
+          asset_content_type: application/octet-stream
