@@ -13,7 +13,7 @@ jobs:
     container:
       image: trojangfw/centos-build:latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build trojan
         run: |
           set -euo pipefail
@@ -22,7 +22,7 @@ jobs:
           make
           strip -s trojan
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: LinuxBinary
           path: ./trojan
@@ -31,7 +31,7 @@ jobs:
     name: Build macOS
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build trojan
         run: |
           set -euo pipefail
@@ -40,7 +40,7 @@ jobs:
           make
           strip -SXTx trojan
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: macOSBinary
           path: ./trojan
@@ -49,19 +49,21 @@ jobs:
     name: Build Windows
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build trojan
         shell: powershell
         run: |
           $ErrorActionPreference = "Stop"
 
-          curl.exe -LO https://slproweb.com/download/Win64OpenSSL-1_1_1h.exe
-          .\Win64OpenSSL-1_1_1h.exe /silent /sp- /suppressmsgboxes /DIR='C:\Program Files\OpenSSL-Win64'
+          # Install OpenSSL
+          Invoke-WebRequest -Uri "https://slproweb.com/download/Win64OpenSSL-1_1_1h.exe" -OutFile "Win64OpenSSL-1_1_1h.exe"
+          Start-Process -FilePath ".\Win64OpenSSL-1_1_1h.exe" -ArgumentList '/silent', '/sp-', '/suppressmsgboxes', '/DIR=C:\Program Files\OpenSSL-Win64' -Wait
 
-          cmake -DBoost_INCLUDE_DIR="$env:BOOST_ROOT_1_72_0\include" -DBoost_USE_STATIC_LIBS=ON -DOPENSSL_ROOT_DIR='C:/Program Files/OpenSSL-Win64' -DOPENSSL_USE_STATIC_LIBS=ON -DENABLE_MYSQL=OFF .
+          # Build
+          cmake -DBoost_INCLUDE_DIR="${{ env.BOOST_ROOT_1_72_0 }}\include" -DBoost_USE_STATIC_LIBS=ON -DOPENSSL_ROOT_DIR='C:/Program Files/OpenSSL-Win64' -DOPENSSL_USE_STATIC_LIBS=ON -DENABLE_MYSQL=OFF .
           cmake --build . --config Release
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: WindowsBinary
           path: ./Release/trojan.exe
@@ -72,7 +74,7 @@ jobs:
     needs: build-linux
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: LinuxBinary
           path: ./LinuxBinary
@@ -86,7 +88,7 @@ jobs:
           cp -r "$(tests/LinuxSmokeTest/basic.sh "$BINARY")" results/basic
           cp -r "$(tests/LinuxSmokeTest/fake-client.sh "$BINARY")" results/fake-client
       - name: Upload test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: LinuxTest
           path: ./results
@@ -97,7 +99,7 @@ jobs:
     needs: build-linux
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: LinuxBinary
           path: ./LinuxBinary
@@ -113,7 +115,7 @@ jobs:
           tar cf trojan-linux-amd64.tar trojan
           xz trojan-linux-amd64.tar
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: LinuxRelease
           path: ./trojan-linux-amd64.tar.xz
@@ -124,7 +126,7 @@ jobs:
     needs: build-macos
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: macOSBinary
           path: ./macOSBinary
@@ -147,7 +149,7 @@ jobs:
           chmod +x trojan/start.command
           zip -r9 trojan-macos.zip trojan
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: macOSRelease
           path: ./trojan-macos.zip
@@ -158,7 +160,7 @@ jobs:
     needs: build-windows
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: WindowsBinary
           path: ./WindowsBinary
@@ -174,7 +176,7 @@ jobs:
           rm trojan/examples/nat.json-example trojan/examples/trojan.service-example
           7z a -mx=9 trojan-win.zip trojan
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: WindowsRelease
           path: ./trojan-win.zip
