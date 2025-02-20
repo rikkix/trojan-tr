@@ -66,6 +66,9 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')   # Only run when a tag is pushed
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download Linux Binary
         uses: actions/download-artifact@v4
         with:
@@ -82,5 +85,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/trojan-linux
-            artifacts/trojan-macos
+            ./artifacts/trojan-linux
+            ./artifacts/trojan-macos
