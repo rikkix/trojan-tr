@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.7.2)
 project(trojan CXX)
 
+set(BUILD_SHARED_LIBS OFF)
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -55,6 +57,8 @@ option(FORCE_TCP_FASTOPEN "Force build with TCP Fast Open support" ON)
 if(FORCE_TCP_FASTOPEN)
     add_definitions(-DTCP_FASTOPEN=23 -DTCP_FASTOPEN_CONNECT=30)
 endif()
+
+set_target_properties(trojan PROPERTIES LINK_FLAGS "-static-libgcc -static-libstdc++")
 
 if(CMAKE_SYSTEM_NAME STREQUAL Linux)
     option(ENABLE_NAT "Build with NAT support" ON)
