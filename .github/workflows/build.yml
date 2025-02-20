@@ -26,7 +26,9 @@ jobs:
                 -DMYSQL_LIBRARY=/usr/local/lib/mariadb/libmysqlclient.a \
                 -DDEFAULT_CONFIG=config.json \
                 -DFORCE_TCP_FASTOPEN=ON \
-                -DBoost_USE_STATIC_LIBS=ON .
+                -DBoost_USE_STATIC_LIBS=ON \
+                -DOPENSSL_USE_STATIC_LIBS=ON \
+                -LA .
           make
           strip -s trojan
 
