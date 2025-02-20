@@ -12,7 +12,8 @@ on:
 jobs:
   build-linux:
     name: Build Linux
-    runs-on: ubuntu-latest
+    # Use Ubuntu 20.04 as the runner to avoid compatibility issues
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v4
 
