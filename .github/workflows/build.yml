@@ -73,13 +73,18 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: LinuxBinary
-          path: ./artifacts/trojan-linux
+          path: ./artifacts/linux
 
       - name: Download macOS Binary
         uses: actions/download-artifact@v4
         with:
           name: macOSBinary
-          path: ./artifacts/trojan-macos
+          path: ./artifacts/macos
+
+      - name: Rename Binary
+        run: |
+          mv ./artifacts/linux/trojan ./artifacts/trojan-linux
+          mv ./artifacts/macos/trojan ./artifacts/trojan-macos
 
       - name: Release
         uses: softprops/action-gh-release@v2
