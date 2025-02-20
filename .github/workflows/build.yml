@@ -1,0 +1,180 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    container:
+      image: trojangfw/centos-build:latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build trojan
+        run: |
+          set -euo pipefail
+          echo 'target_link_libraries(trojan dl)' >> CMakeLists.txt
+          cmake -DMYSQL_INCLUDE_DIR=/usr/local/include/mariadb -DMYSQL_LIBRARY=/usr/local/lib/mariadb/libmysqlclient.a -DDEFAULT_CONFIG=config.json -DFORCE_TCP_FASTOPEN=ON -DBoost_USE_STATIC_LIBS=ON .
+          make
+          strip -s trojan
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: LinuxBinary
+          path: ./trojan
+
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build trojan
+        run: |
+          set -euo pipefail
+          brew install boost openssl@1.1
+          cmake -DBoost_USE_STATIC_LIBS=ON -DOPENSSL_INCLUDE_DIR=/usr/local/opt/openssl@1.1/include -DOPENSSL_CRYPTO_LIBRARY=/usr/local/opt/openssl@1.1/lib/libcrypto.a -DOPENSSL_SSL_LIBRARY=/usr/local/opt/openssl@1.1/lib/libssl.a -DDEFAULT_CONFIG=config.json -DENABLE_MYSQL=OFF -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13 .
+          make
+          strip -SXTx trojan
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: macOSBinary
+          path: ./trojan
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build trojan
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          curl.exe -LO https://slproweb.com/download/Win64OpenSSL-1_1_1h.exe
+          .\Win64OpenSSL-1_1_1h.exe /silent /sp- /suppressmsgboxes /DIR='C:\Program Files\OpenSSL-Win64'
+
+          cmake -DBoost_INCLUDE_DIR="$env:BOOST_ROOT_1_72_0\include" -DBoost_USE_STATIC_LIBS=ON -DOPENSSL_ROOT_DIR='C:/Program Files/OpenSSL-Win64' -DOPENSSL_USE_STATIC_LIBS=ON -DENABLE_MYSQL=OFF .
+          cmake --build . --config Release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: WindowsBinary
+          path: ./Release/trojan.exe
+
+  test-linux:
+    name: Test Linux
+    runs-on: ubuntu-latest
+    needs: build-linux
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: LinuxBinary
+          path: ./LinuxBinary
+      - name: Run tests
+        env:
+          BINARY: ./LinuxBinary/trojan
+        run: |
+          set -uo pipefail
+          chmod +x "$BINARY"
+          mkdir results
+          cp -r "$(tests/LinuxSmokeTest/basic.sh "$BINARY")" results/basic
+          cp -r "$(tests/LinuxSmokeTest/fake-client.sh "$BINARY")" results/fake-client
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: LinuxTest
+          path: ./results
+
+  package-linux:
+    name: Package Linux
+    runs-on: ubuntu-latest
+    needs: build-linux
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: LinuxBinary
+          path: ./LinuxBinary
+      - name: Package trojan
+        run: |
+          set -euo pipefail
+          BINARY="./LinuxBinary/trojan"
+          chmod +x "$BINARY"
+          mkdir trojan
+          cp "$BINARY" trojan/trojan
+          cp -r examples CONTRIBUTORS.md LICENSE README.md trojan
+          cp examples/server.json-example trojan/config.json
+          tar cf trojan-linux-amd64.tar trojan
+          xz trojan-linux-amd64.tar
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: LinuxRelease
+          path: ./trojan-linux-amd64.tar.xz
+
+  package-macos:
+    name: Package macOS
+    runs-on: macos-latest
+    needs: build-macos
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: macOSBinary
+          path: ./macOSBinary
+      - name: Package trojan
+        run: |
+          set -euo pipefail
+          BINARY="./macOSBinary/trojan"
+          chmod +x "$BINARY"
+          mkdir trojan
+          cp "$BINARY" trojan/trojan
+          cp -r examples CONTRIBUTORS.md LICENSE README.md trojan
+          cp examples/client.json-example trojan/config.json
+          rm trojan/examples/nat.json-example trojan/examples/trojan.service-example
+          cat > trojan/start.command <<EOF
+          #!/bin/sh
+
+          cd "\$(dirname "\$0")"
+          ./trojan
+          EOF
+          chmod +x trojan/start.command
+          zip -r9 trojan-macos.zip trojan
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: macOSRelease
+          path: ./trojan-macos.zip
+
+  package-windows:
+    name: Package Windows
+    runs-on: windows-latest
+    needs: build-windows
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: WindowsBinary
+          path: ./WindowsBinary
+      - name: Package trojan
+        shell: bash
+        run: |
+          set -euo pipefail
+          BINARY="./WindowsBinary/trojan.exe"
+          mkdir trojan
+          cp "$BINARY" trojan/trojan.exe
+          cp -r examples CONTRIBUTORS.md LICENSE README.md trojan
+          cp examples/client.json-example trojan/config.json
+          rm trojan/examples/nat.json-example trojan/examples/trojan.service-example
+          7z a -mx=9 trojan-win.zip trojan
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: WindowsRelease
+          path: ./trojan-win.zip
